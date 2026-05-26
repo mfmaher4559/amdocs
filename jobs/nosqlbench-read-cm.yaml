@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: simple-read-nb
+  namespace: hd-soak
+data:
+  simple-read.yaml: |
+    scenarios:
+      default:
+        schema: run driver=cqld4 tags==block:schema threads==1 cycles==UNDEF
+        read: run driver=cqld4 tags==block:read cycles===50000 threads=10
+    bindings:
+      id: Mod(100000); ToHashedUUID() -> java.util.UUID
+      data: HashedLineToString('data/lorem_ipsum_full.txt')
+    blocks:
+      schema:
+        ops:
+          create-keyspace: |
+            CREATE KEYSPACE IF NOT EXISTS baselines
+            WITH replication = {'class': 'NetworkTopologyStrategy', 'region-a': '3', 'region-b': '3'};
+          create-table: |
+            CREATE TABLE IF NOT EXISTS baselines.test_data (
+              id uuid PRIMARY KEY,
+              data text
+            );
+      read:
+        ops:
+          read-data: |
+            SELECT * FROM baselines.test_data WHERE id = {id};

@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: simple-write-nb
+  namespace: hd-soak
+data:
+  simple.yaml: |
+    min_version: "5.17.1"
+    description: "Simple write workload for testing node replacement"
+
+    scenarios:
+      schema: run driver=cql tags==phase:schema threads==1 cycles==UNDEF
+      rampup: run driver=cql tags==phase:rampup cycles=100000 threads=auto
+
+    bindings:
+      id: ToUUID(); ToString();
+      data: HashedToByteBuffer(1024); ToString();
+
+    blocks:
+      - tags:
+          phase: schema
+        params:
+          prepared: false
+          timeout: 300.0
+        statements:
+          - create-keyspace: |
+              CREATE KEYSPACE IF NOT EXISTS baselines 
+              WITH replication = {'class': 'NetworkTopologyStrategy', 'region-a': 3, 'region-b': 3};
+          - create-table: |
+              CREATE TABLE IF NOT EXISTS baselines.test_data (
+                id text PRIMARY KEY,
+                data text
+              );
+
+      - tags:
+          phase: rampup
+        params:
+          cl: LOCAL_QUORUM
+          instrument: true
+          timeout: 20.0
+          prepared: true
+        statements:
+          - insert-data: |
+              INSERT INTO baselines.test_data (id, data) VALUES ({id}, {data});
+

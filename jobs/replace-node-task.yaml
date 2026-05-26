@@ -1,0 +1,14 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: replace-rack1-sts-0
+  namespace: hd-soak
+spec:
+  datacenter:
+    name: region-a
+    namespace: hd-soak
+  jobs:
+    - name: replace
+      command: replace
+      args:
+        pod_name: density-ops-region-a-rack1-sts-0

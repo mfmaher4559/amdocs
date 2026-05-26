@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nosqlbench-read-test
+  namespace: hd-soak
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 2
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: nb
+        image: nosqlbench/nosqlbench:latest
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_OPTS
+          value: --enable-preview --enable-native-access=ALL-UNNAMED
+        - name: CASS_USER
+          valueFrom:
+            secretKeyRef:
+              name: density-ops-superuser
+              key: username
+        - name: CASS_PASS
+          valueFrom:
+            secretKeyRef:
+              name: density-ops-superuser
+              key: password
+        args:
+        - workloads/simple-read
+        - default.read
+        - hosts=density-ops-region-a-service.hd-soak.svc.cluster.local
+        - username=$(CASS_USER)
+        - password=$(CASS_PASS)
+        - localdc=region-a
+        - --progress
+        - console:5s
+        - --show-stacktraces
+        resources:
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+        volumeMounts:
+        - name: workload
+          mountPath: /workloads
+        - name: logs
+          mountPath: /logs
+        - name: state
+          mountPath: /.nosqlbench
+      volumes:
+      - name: workload
+        configMap:
+          name: simple-read-nb
+      - name: logs
+        emptyDir: {}
+      - name: state
+        emptyDir: {}
+

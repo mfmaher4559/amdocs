@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ads-seeder
+  namespace: hd-soak
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        performance.datastax.com/role: application
+      containers:
+        - name: ads-seeder
+          image: <your-registry>/ads-seeder:latest
+          args:
+            - "-db-type=datastax"
+            - "-operation=seed"
+            - "-ads-total=50000000000"
+            - "-pool-size=64"
+            - "-datastax-uri=hcd-hcd-dc-1-service.hcd-iot-6532hsif.svc.cluster.local"
+            - "-datastax-username=hcd-superuser"
+            - "-datastax-password=$(DATASTAX_PASSWORD)"
+            - "-v"
+          env:
+            - name: DATASTAX_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hcd-superuser
+                  key: password
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "16"
+              memory: "16Gi"

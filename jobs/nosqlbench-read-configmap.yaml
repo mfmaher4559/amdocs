@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: simple-read-nb
+  namespace: hd-soak
+data:
+  simple-read.yaml: |
+    scenarios:
+      default:
+        read: run driver=cqld4 tags==block:read cycles===50000 threads=10
+    bindings:
+      id: Mod(100000); ToHashedUUID() -> java.util.UUID; ToString() -> String
+    blocks:
+      read:
+        ops:
+          read-data: |
+            SELECT * FROM baselines.test_data WHERE id = {id};
+

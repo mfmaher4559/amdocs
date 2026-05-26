@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Secret
+metadata:
+ name: medusa-bucket-key
+type: Opaque
+stringData:
+ credentials: |-
+    {
+      "type": "service_account",
+      "project_id": "gcp-project-name",
+      "private_key_id": "PRIVATE_KEY_ID",
+      "private_key": "-----BEGIN PRIVATE KEY-----\n
+      ...
+       insert extensive alphanumeric string
+      ...
+      \n-----END PRIVATE KEY-----\n",
+      "client_email": "medusa@gcp-project.iam.gserviceaccount.com",
+      "client_id": "CLIENT_ID",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/medusa%40gcp-project.iam.gserviceaccount.com"
+    }

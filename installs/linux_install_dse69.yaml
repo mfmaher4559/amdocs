@@ -1,0 +1,148 @@
+---
+- name: Install DSE 6.9 with Java 8
+  hosts: all
+  become: yes
+
+  vars:
+    dse_remote_tarball: "/home/ec2-user/dse-6.9.14-bin.tar.gz"
+    dse_install_dir: "/opt/dse"
+    cassandra_data_dir: "/var/lib/cassandra"
+    cassandra_log_dir: "/var/log/cassandra"
+    cassandra_yaml: "/opt/dse/resources/cassandra/conf/cassandra.yaml"
+    jvm_options_file: "/opt/dse/resources/cassandra/conf/jvm.options"
+
+  tasks:
+
+    - name: Stop existing Cassandra process (if running)
+      shell: "pkill -f CassandraDaemon || true"
+      ignore_errors: yes
+
+    # ✅ Java 8 for DSE 6.9
+    - name: Install Java 8 (Amazon Corretto)
+      ansible.builtin.package:
+        name: java-1.8.0-amazon-corretto
+        state: present
+
+    - name: Find Java 8 binary
+      ansible.builtin.shell: "find /usr/lib/jvm -path '*/bin/java' | grep -E 'java-1.8|corretto-8|java-8' | head -1"
+      register: java8_path
+      changed_when: false
+
+    - name: Set Java 8 as default
+      ansible.builtin.command: "alternatives --set java {{ java8_path.stdout }}"
+      when: java8_path.stdout | length > 0
+
+    - name: Verify Java version
+      command: java -version
+      register: java_version_output
+      changed_when: false
+
+    - name: Show Java version
+      debug:
+        var: java_version_output.stderr_lines
+
+    - name: Install archive tools
+      ansible.builtin.package:
+        name:
+          - bzip2
+          - xz
+          - unzip
+          - tar
+          - gzip
+        state: present
+
+    - name: Ensure DSE directory exists
+      file:
+        path: "{{ dse_install_dir }}"
+        state: directory
+
+    # - name: Copy DSE tarball to remote host
+    #   ansible.builtin.copy:
+    #     src: "{{ dse_tarball }}"
+    #     dest: /tmp/dse.tar.gz
+    #     mode: '0644'
+
+    - name: Extract DSE tarball
+      ansible.builtin.unarchive:
+        src: "{{ dse_remote_tarball }}"
+        dest: "{{ dse_install_dir }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Ensure cassandra user exists
+      ansible.builtin.user:
+        name: cassandra
+        shell: /bin/false
+        system: yes
+        create_home: no
+
+    - name: Ensure log directory exists
+      file:
+        path: "{{ cassandra_log_dir }}"
+        owner: cassandra
+        group: cassandra
+        state: directory
+        recurse: true
+        mode: "0777"
+
+    - name: Ensure data directory exists
+      file:
+        path: "{{ cassandra_data_dir }}"
+        owner: cassandra
+        group: cassandra
+        state: directory
+        recurse: true
+        mode: "0777"
+
+    # ✅ JVM tuning (Java 8 file)
+    - name: Set Java heap size
+      lineinfile:
+        path: "{{ jvm_options_file }}"
+        regexp: '^-Xmx'
+        line: "-Xmx31G"
+
+    - name: Set num_tokens
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: '^num_tokens:'
+        line: 'num_tokens: 8'
+
+    - name: Set concurrent_compactors
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: '^#?concurrent_compactors:.*'
+        line: 'concurrent_compactors: 16'
+
+    - name: Set listen_address
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: '^#?listen_address:.*'
+        line: "listen_address: {{ ansible_default_ipv4.address }}"
+
+    - name: Set rpc_address
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: '^#?rpc_address:.*'
+        line: "rpc_address: {{ ansible_default_ipv4.address }}"
+
+    - name: Set seed node
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: 'seeds:'
+        line: '          - seeds: "127.0.0.1"'
+
+    - name: Configure data directories
+      lineinfile:
+        path: "{{ cassandra_yaml }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: '^# data_file_directories:', line: 'data_file_directories:' }
+        - { regexp: '^#     - /var/lib/cassandra/data', line: '     - /var/lib/cassandra/data' }
+        - { regexp: '^# commitlog_directory:', line: 'commitlog_directory: /var/lib/cassandra/commitlog' }
+
+    # ✅ Start DSE
+    - name: Start DSE
+      shell: "{{ dse_install_dir }}/bin/dse cassandra"
+      async: 30
+      poll: 0
