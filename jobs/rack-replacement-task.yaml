@@ -1,0 +1,17 @@
+apiVersion: control.k8ssandra.io/v1alpha1
+kind: CassandraTask
+metadata:
+  name: replace-rack1
+  namespace: hd-soak
+spec:
+  concurrencyPolicy: Forbid
+  datacenter:
+    name: region-a
+    namespace: hd-soak
+  jobs:
+    - name: replace-rack1
+      command: replacenode
+      args:
+        rack: rack1
+  scheduledTime: "2026-05-28T15:30:00Z"
+  ttlSecondsAfterFinished: 600

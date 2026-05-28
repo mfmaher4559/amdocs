@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nosqlbench-hint-generation
+  namespace: hd-soak
+spec:
+  template:
+    spec:
+      containers:
+      - name: nosqlbench
+        image: nosqlbench/nosqlbench:latest
+        command:
+        - /bin/sh
+        - -c
+        - |
+          nb5 cql-keyvalue \
+            hosts=density-ops-region-a-all-pods-service.hd-soak.svc.cluster.local \
+            keyspace=baselines \
+            table=test_data \
+            rf=3 \
+            write_cl=ONE \
+            read_cl=ONE \
+            rampup-cycles=50000 \
+            main-cycles=50000 \
+            threads=10 \
+            --progress console:5s
+        volumeMounts:
+        - name: workload
+          mountPath: /workload
+      volumes:
+      - name: workload
+        configMap:
+          name: simple-write-nb
+      restartPolicy: Never
+  backoffLimit: 0
+
+# Made with Bob
